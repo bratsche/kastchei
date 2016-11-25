@@ -1,0 +1,28 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.25420.1
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kastchei", "Kastchei\Kastchei.csproj", "{B86441CF-00DF-4F05-9CF8-5980C27C7BB0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Kastchei.Demo", "Kastchei.Demo\Kastchei.Demo.csproj", "{3AA8AC1B-ACC1-4B0B-BA0E-91B0029D83AC}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B86441CF-00DF-4F05-9CF8-5980C27C7BB0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B86441CF-00DF-4F05-9CF8-5980C27C7BB0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B86441CF-00DF-4F05-9CF8-5980C27C7BB0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B86441CF-00DF-4F05-9CF8-5980C27C7BB0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3AA8AC1B-ACC1-4B0B-BA0E-91B0029D83AC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3AA8AC1B-ACC1-4B0B-BA0E-91B0029D83AC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3AA8AC1B-ACC1-4B0B-BA0E-91B0029D83AC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3AA8AC1B-ACC1-4B0B-BA0E-91B0029D83AC}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

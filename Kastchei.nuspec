@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>Kastchei</id>
+    <version>0.9.0-beta1</version>
+    <authors>Cody Russell</authors>
+    <owners>Cody Russell</owners>
+    <licenseUrl>https://github.com/bratsche/kastchei/blob/master/LICENSE</licenseUrl>
+    <projectUrl>https://github.com/bratsche/kastchei</projectUrl>
+    <requireLicenseAcceptance>true</requireLicenseAcceptance>
+    <description>Phoenix Channel client</description>
+    <releaseNotes>Initial release</releaseNotes>
+    <copyright>Copyright 2016</copyright>
+    <tags>Phoenix Elixir rx reactive websocket</tags>
+    <dependencies>
+      <dependency id="Newtonsoft.Json" version="9.0.1" />
+      <dependency id="WebSocket4Net" version="0.15.0-beta6" />
+      <dependency id="Rx-Main" version="2.2.5" />
+    </dependencies>
+    <references>
+      <reference file="Kastchei.dll" />
+    </references>
+  </metadata>
+  <files>
+    <file src="Kastchei/bin/Release/Kastchei.dll" target="lib/net45/Kastchei.dll" />
+    <file src="Kastchei/bin/Release/Kastchei.dll" target="lib/wp80/Kastchei.dll" />
+    <file src="Kastchei/bin/Release/Kastchei.dll" target="lib/monoandroid10/Kastchei.dll" />
+    <file src="Kastchei/bin/Release/Kastchei.dll" target="lib/xamarinios10/Kastchei.dll" />
+    <file src="Kastchei/bin/Release/Kastchei.dll" target="lib/netstandard1.3/Kastchei.dll" />
+  </files>
+</package>
