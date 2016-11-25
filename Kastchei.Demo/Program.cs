@@ -21,7 +21,6 @@ namespace Kastchei.Demo
                 {
                     Console.WriteLine("Got channel...");
 
-                    //channel.Join<Dictionary<string,string>>("ok", (x) => Console.WriteLine("Join 'control:demo' responded OK"));
                     channel.Join()
                            .MatchOn<Dictionary<string, string>>("ok")
                            .Subscribe(x => Console.WriteLine("Join 'control:demo' responded OK"));
