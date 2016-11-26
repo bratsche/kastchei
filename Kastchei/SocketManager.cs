@@ -68,8 +68,6 @@ namespace Kastchei
             var stateChanges = WhenOpen.DistinctUntilChanged()
                                        .Scan(new StateChange(), (prev, next) => new StateChange(prev.Current, next));
 
-            stateChanges.Subscribe(x => Console.WriteLine($"  [State: {x.Previous} -> {x.Current} ]")).DisposeWith(compositeDisposable);
-
             /* Control whether to open or close the socket. */
             stateChanges.Select(x => x.Current)
                         .CombineLatest(needOpenSubject.DistinctUntilChanged(), (isOpen, needOpen) => {
