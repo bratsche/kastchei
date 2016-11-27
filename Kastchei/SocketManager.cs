@@ -75,7 +75,8 @@ namespace Kastchei
                                    Observable.Interval(TimeSpan.FromMilliseconds(HEARTBEAT_INTERVAL)),
                                    (currentState, needOpen, _time) => currentState == SocketState.Open && needOpen)
                     .Where(x => x == true)
-                    .Subscribe(x => SendHeartbeat());
+                    .Subscribe(x => SendHeartbeat())
+                    .DisposeWith(compositeDisposable);
 
             /* State changes */
             var stateChanges = WhenOpen.DistinctUntilChanged()
