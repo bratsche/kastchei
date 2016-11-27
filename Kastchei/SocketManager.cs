@@ -3,10 +3,12 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using System.ComponentModel;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using System.Reactive.Disposables;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
 
 using WebSocket4Net;
 using Newtonsoft.Json;
@@ -14,15 +16,26 @@ using Newtonsoft.Json.Linq;
 
 namespace Kastchei
 {
-    public class SocketManager : IDisposable
+    public class SocketManager : IDisposable, INotifyPropertyChanged
     {
         const int HEARTBEAT_INTERVAL = 30000;
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        WebSocket Socket
+        {
+            get { return socket; }
+            set {
+                this.socket = value;
+                OnPropertyChanged();
+            }
+        }
 
         public SocketManager(string endpoint)
         {
             /* Setup the socket */
-            socket = new WebSocket(endpoint).DisposeWith(compositeDisposable);
-            Frames = Observable.FromEventPattern<MessageReceivedEventArgs>(socket, "MessageReceived")
+            Socket = new WebSocket(endpoint).DisposeWith(compositeDisposable);
+            Frames = Observable.FromEventPattern<MessageReceivedEventArgs>(Socket, "MessageReceived")
                                .Select(x => JObject.Parse(x.EventArgs.Message));
 
             /* This determines when we want the socket to be open */
@@ -33,27 +46,27 @@ namespace Kastchei
             var WhenOpen = Observable.Create<SocketState>(observer => {
                 var connect = new EventHandler((o, e) => observer.OnNext(SocketState.Open));
                 var error = new EventHandler<SuperSocket.ClientEngine.ErrorEventArgs>((o, e) => {
-                    if (socket.State == WebSocketState.Closed) {
+                    if (Socket.State == WebSocketState.Closed) {
                         observer.OnNext(SocketState.Closed);
                     } else {
-                        socket.Close();
+                        Socket.Close();
                         observer.OnNext(SocketState.Closing);
                     }
                 });
 
                 var closed = new EventHandler((o, e) => {
-                    if (socket.State == WebSocketState.Closed)
+                    if (Socket.State == WebSocketState.Closed)
                         observer.OnNext(SocketState.Closed);
                 });
 
-                socket.Opened += connect;
-                socket.Closed += closed;
-                socket.Error += error;
+                Socket.Opened += connect;
+                Socket.Closed += closed;
+                Socket.Error += error;
 
                 return () => {
-                    socket.Opened -= connect;
-                    socket.Closed -= closed;
-                    socket.Error -= error;
+                    Socket.Opened -= connect;
+                    Socket.Closed -= closed;
+                    Socket.Error -= error;
                 };
             }).Merge(connectingSubject.AsObservable());
 
@@ -77,19 +90,19 @@ namespace Kastchei
                 var needOpen = x.Item2;
 
                 if (!(isOpen == SocketState.Open || isOpen == SocketState.Opening) && needOpen) {
-                    if (socket.State != WebSocketState.Connecting) {
+                    if (Socket.State != WebSocketState.Connecting) {
                         connectingSubject.OnNext(SocketState.Opening);
-                        socket.Open();
+                        Socket.Open();
                     }
                 } else if (isOpen == SocketState.Open && !needOpen) {
-                    socket.Close();
+                    Socket.Close();
                     connectingSubject.OnNext(SocketState.Closing);
                 }
             }).DisposeWith(compositeDisposable);
 
             /* Setup logic for sending messages. We queue them up until WhenOpen informs us that we're connected, then send */
             var published = sendSubject.Publish();
-            published.Subscribe(x => socket.Send(x)).DisposeWith(compositeDisposable);
+            published.Subscribe(x => Socket.Send(x)).DisposeWith(compositeDisposable);
 
             WhenOpen.Subscribe(x => {
                 if (x == SocketState.Open) {
@@ -138,11 +151,18 @@ namespace Kastchei
             Send(json);
         }
 
+        protected void OnPropertyChanged([CallerMemberName] string prop = "")
+        {
+            var handler = PropertyChanged;
+            if (handler != null)
+                handler(this, new PropertyChangedEventArgs(prop));
+        }
+
         protected virtual void Dispose(bool disposing)
         {
             if (!disposedValue) {
                 if (disposing) {
-                    if (socket.State == WebSocketState.Open)
+                    if (Socket.State == WebSocketState.Open)
                         needOpenSubject.OnNext(false);
 
                     compositeDisposable.Dispose();
