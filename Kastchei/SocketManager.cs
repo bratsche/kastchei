@@ -131,7 +131,7 @@ namespace Kastchei
 
                     /* Setup logic for sending messages. We queue them up until we're connected, then send. */
                     var published = sendSubject.Publish();
-                    published.Subscribe(p => x.Send(p)).DisposeWith(compositeDisposable); // make a local IDisposable?
+                    published.Subscribe(p => x.Send(p)).DisposeWith(compositeDisposable);
 
                     whenOpen.Catch<SocketState, Exception>(ex => Observable.Return(SocketState.None))
                             .Subscribe(s =>
