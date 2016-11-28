@@ -19,99 +19,174 @@ namespace Kastchei
     public class SocketManager : IDisposable, INotifyPropertyChanged
     {
         const int HEARTBEAT_INTERVAL = 30000;
+        const string FORBIDDEN_MESSAGE = "HTTP/1.1 403 Forbidden";
 
         public event PropertyChangedEventHandler PropertyChanged;
 
         WebSocket Socket
         {
             get { return socket; }
-            set {
+            set
+            {
                 this.socket = value;
                 OnPropertyChanged();
             }
         }
 
-        public SocketManager(string endpoint)
+        internal IObservable<JObject> Frames
         {
-            /* Setup the socket */
-            Socket = new WebSocket(endpoint).DisposeWith(compositeDisposable);
-            Frames = Observable.FromEventPattern<MessageReceivedEventArgs>(Socket, "MessageReceived")
-                               .Select(x => JObject.Parse(x.EventArgs.Message));
+            get { return framesSubject.AsObservable(); }
+        }
 
+        public SocketManager(string endpoint)
+            : this(Observable.Return(endpoint))
+        {
+        }
+
+        public SocketManager(IObservable<string> endpointObservable)
+        {
             /* This determines when we want the socket to be open */
-            needOpenSubject = new BehaviorSubject<bool>(false).DisposeWith(compositeDisposable);
+            needOpenSubject = new BehaviorSubject<bool>(false);
 
-            /* WhenOpen lets us know when the socket actually is open. */
-            var connectingSubject = new BehaviorSubject<SocketState>(SocketState.None);
-            var WhenOpen = Observable.Create<SocketState>(observer => {
-                var connect = new EventHandler((o, e) => observer.OnNext(SocketState.Open));
-                var error = new EventHandler<SuperSocket.ClientEngine.ErrorEventArgs>((o, e) => {
-                    if (Socket.State == WebSocketState.Closed) {
+            /* Setup the frame management */
+            this.GetPropertyValues(x => x.Socket)
+                .Subscribe(x =>
+                {
+                    if (x == null)
+                    {
+                        if (frameDisposable != null)
+                        {
+                            frameDisposable.Dispose();
+                            frameDisposable = null;
+                        }
+                    }
+                    else
+                    {
+                        frameDisposable =
+                            Observable.FromEventPattern<MessageReceivedEventArgs>(x, "MessageReceived")
+                                      .Select(y => JObject.Parse(y.EventArgs.Message))
+                                      .Subscribe(y => framesSubject.OnNext(y))
+                                      .DisposeWith(compositeDisposable);
+                    }
+                }).DisposeWith(compositeDisposable);
+
+            this.GetPropertyValues(x => x.Socket)
+                .DistinctUntilChanged()
+                .Where(x => x == null)
+                .Zip(endpointObservable, (x, y) => y)
+                .Subscribe(x =>
+                {
+                    connectingSubject = new BehaviorSubject<SocketState>(SocketState.None);
+                    Socket = new WebSocket(x).DisposeWith(compositeDisposable);
+                }).DisposeWith(compositeDisposable);
+
+            this.GetPropertyValues(x => x.Socket)
+                .DistinctUntilChanged()
+                .Where(x => x != null)
+                .Subscribe(x =>
+                {
+                    var whenOpen = GetConnectionStateObservable(x);
+
+                    /* Heartbeat */
+                    whenOpen.CombineLatest(needOpenSubject.AsObservable().DistinctUntilChanged(),
+                                           Observable.Interval(TimeSpan.FromMilliseconds(HEARTBEAT_INTERVAL)),
+                                           (currentState, needOpen, _time) => currentState == SocketState.Open && needOpen)
+                            .Catch<bool, Exception>(ex => Observable.Return(false))
+                            .Where(y => y)
+                            .Subscribe(_ => SendHeartbeat());
+
+                    /* Control whether to open or close the socket */
+                    whenOpen.DistinctUntilChanged()
+                            .Scan(new StateChange(), (prev, next) => new StateChange(prev.Current, next))
+                            .Select(s => s.Current)
+                            .CombineLatest(needOpenSubject.DistinctUntilChanged(), (isOpen, needOpen) => new Tuple<SocketState, bool>(isOpen, needOpen))
+                            .Delay(TimeSpan.FromMilliseconds(250))
+                            .Catch<Tuple<SocketState, bool>, Exception>(ex =>
+                            {
+                                x.Close();
+                                connectingSubject.Dispose();
+                                connectingSubject = null;
+                                this.Socket = null;
+                                return Observable.Return(new Tuple<SocketState, bool>(SocketState.None, false));
+                            })
+                            .Subscribe(t =>
+                            {
+                                var isOpen = t.Item1;
+                                var needOpen = t.Item2;
+
+                                if (!(isOpen == SocketState.Open || isOpen == SocketState.Opening) && needOpen)
+                                {
+                                    if (x.State != WebSocketState.Connecting)
+                                    {
+                                        connectingSubject.OnNext(SocketState.Opening);
+                                        x.Open();
+                                    }
+                                }
+                                else if (isOpen == SocketState.Open && !needOpen)
+                                {
+                                    x.Close();
+                                    connectingSubject.OnNext(SocketState.Closing);
+                                }
+                            }).DisposeWith(compositeDisposable);
+
+                    /* Setup logic for sending messages. We queue them up until we're connected, then send. */
+                    var published = sendSubject.Publish();
+                    published.Subscribe(p => x.Send(p)).DisposeWith(compositeDisposable); // make a local IDisposable?
+
+                    whenOpen.Catch<SocketState, Exception>(ex => Observable.Return(SocketState.None))
+                            .Subscribe(s =>
+                            {
+                                if (s == SocketState.Open)
+                                    sendConnection = new CompositeDisposable(published.Connect(), Disposable.Create(() => sendSubject.Clear()));
+                                else if (sendConnection != null)
+                                    sendConnection.Dispose();
+                            }).DisposeWith(compositeDisposable);
+                });
+        }
+
+        public IObservable<SocketState> GetConnectionStateObservable(WebSocket sock)
+        {
+            return Observable.Create<SocketState>(observer =>
+            {
+                var connect = new EventHandler((o, e) =>
+                {
+                    observer.OnNext(SocketState.Open);
+                });
+                var error = new EventHandler<SuperSocket.ClientEngine.ErrorEventArgs>((o, e) =>
+                {
+                    if (e.Exception.Message == FORBIDDEN_MESSAGE)
+                    {
+                        observer.OnError(e.Exception);
+                    }
+
+                    if (sock.State == WebSocketState.Closed)
+                    {
                         observer.OnNext(SocketState.Closed);
-                    } else {
-                        Socket.Close();
+                    }
+                    else
+                    {
+                        sock.Close();
                         observer.OnNext(SocketState.Closing);
                     }
                 });
 
-                var closed = new EventHandler((o, e) => {
-                    if (Socket.State == WebSocketState.Closed)
+                var closed = new EventHandler((o, e) =>
+                {
+                    if (sock.State == WebSocketState.Closed)
                         observer.OnNext(SocketState.Closed);
                 });
 
-                Socket.Opened += connect;
-                Socket.Closed += closed;
-                Socket.Error += error;
+                sock.Opened += connect;
+                sock.Closed += closed;
+                sock.Error += error;
 
-                return () => {
-                    Socket.Opened -= connect;
-                    Socket.Closed -= closed;
-                    Socket.Error -= error;
+                return () =>
+                {
+                    sock.Opened -= connect;
+                    sock.Closed -= closed;
+                    sock.Error -= error;
                 };
             }).Merge(connectingSubject.AsObservable());
-
-            /* Heartbeat */
-            WhenOpen.CombineLatest(needOpenSubject.AsObservable().DistinctUntilChanged(),
-                                   Observable.Interval(TimeSpan.FromMilliseconds(HEARTBEAT_INTERVAL)),
-                                   (currentState, needOpen, _time) => currentState == SocketState.Open && needOpen)
-                    .Where(x => x == true)
-                    .Subscribe(x => SendHeartbeat())
-                    .DisposeWith(compositeDisposable);
-
-            /* State changes */
-            var stateChanges = WhenOpen.DistinctUntilChanged()
-                                       .Scan(new StateChange(), (prev, next) => new StateChange(prev.Current, next));
-
-            /* Control whether to open or close the socket. */
-            stateChanges.Select(x => x.Current)
-                        .CombineLatest(needOpenSubject.DistinctUntilChanged(), (isOpen, needOpen) => {
-                return new Tuple<SocketState, bool>(isOpen, needOpen);
-            }).Delay(TimeSpan.FromMilliseconds(250)).Subscribe(x => {
-                var isOpen = x.Item1;
-                var needOpen = x.Item2;
-
-                if (!(isOpen == SocketState.Open || isOpen == SocketState.Opening) && needOpen) {
-                    if (Socket.State != WebSocketState.Connecting) {
-                        connectingSubject.OnNext(SocketState.Opening);
-                        Socket.Open();
-                    }
-                } else if (isOpen == SocketState.Open && !needOpen) {
-                    Socket.Close();
-                    connectingSubject.OnNext(SocketState.Closing);
-                }
-            }).DisposeWith(compositeDisposable);
-
-            /* Setup logic for sending messages. We queue them up until WhenOpen informs us that we're connected, then send */
-            var published = sendSubject.Publish();
-            published.Subscribe(x => Socket.Send(x)).DisposeWith(compositeDisposable);
-
-            WhenOpen.Subscribe(x => {
-                if (x == SocketState.Open) {
-                    sendConnection = new CompositeDisposable(published.Connect(), Disposable.Create(() => sendSubject.Clear()));
-                } else if (sendConnection != null) {
-                    sendConnection.Dispose();
-                }
-            }).DisposeWith(compositeDisposable);
         }
 
         public Channel Channel(string topic)
@@ -167,6 +242,7 @@ namespace Kastchei
                         needOpenSubject.OnNext(false);
 
                     compositeDisposable.Dispose();
+                    needOpenSubject.Dispose();
                 }
 
                 disposedValue = true;
@@ -178,12 +254,14 @@ namespace Kastchei
             Dispose(true);
         }
 
-        internal IObservable<JObject> Frames { get; set; }
+        Subject<JObject> framesSubject = new Subject<JObject>();
+        BehaviorSubject<SocketState> connectingSubject;
         WebSocket socket;
         UInt64 currentRef = 0;
         int n_channels = 0;
         bool disposedValue = false;
         IDisposable sendConnection;
+        IDisposable frameDisposable;
         CompositeDisposable compositeDisposable = new CompositeDisposable();
         SocketSendSubject sendSubject = new SocketSendSubject();
         BehaviorSubject<bool> needOpenSubject;
