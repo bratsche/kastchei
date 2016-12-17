@@ -9,6 +9,7 @@ namespace Kastchei
         [Description("Closed")]  Closed,
         [Description("Closing")] Closing,
         [Description("Open")]    Open,
-        [Description("Opening")] Opening
+        [Description("Opening")] Opening,
+        [Description("Errored")] Errored
     }
 }

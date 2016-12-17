@@ -23,6 +23,11 @@ namespace Kastchei
 
         public event PropertyChangedEventHandler PropertyChanged;
 
+        public IObservable<SocketState> State
+        {
+            get { return publicState.AsObservable(); }
+        }
+
         WebSocket Socket
         {
             get { return socket; }
@@ -107,6 +112,7 @@ namespace Kastchei
                                 connectingSubject.Dispose();
                                 connectingSubject = null;
                                 this.Socket = null;
+                                publicState.OnNext(SocketState.Errored);
                                 return Observable.Return(new Tuple<SocketState, bool>(SocketState.None, false));
                             })
                             .Subscribe(t =>
@@ -127,6 +133,7 @@ namespace Kastchei
                                     x.Close();
                                     connectingSubject.OnNext(SocketState.Closing);
                                 }
+                                publicState.OnNext(isOpen);
                             }).DisposeWith(compositeDisposable);
 
                     /* Setup logic for sending messages. We queue them up until we're connected, then send. */
@@ -144,7 +151,7 @@ namespace Kastchei
                 });
         }
 
-        public IObservable<SocketState> GetConnectionStateObservable(WebSocket sock)
+        IObservable<SocketState> GetConnectionStateObservable(WebSocket sock)
         {
             return Observable.Create<SocketState>(observer =>
             {
@@ -256,6 +263,7 @@ namespace Kastchei
 
         Subject<JObject> framesSubject = new Subject<JObject>();
         BehaviorSubject<SocketState> connectingSubject;
+        Subject<SocketState> publicState = new Subject<SocketState>();
         WebSocket socket;
         UInt64 currentRef = 0;
         int n_channels = 0;
