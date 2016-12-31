@@ -69,8 +69,8 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Channel.cs" />
-    <Compile Include="Frame.cs" />
-    <Compile Include="Payload.cs" />
+    <Compile Include="ResponseFrame.cs" />
+    <Compile Include="ResponsePayload.cs" />
     <Compile Include="PushFrame.cs" />
     <Compile Include="SocketManager.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -79,6 +79,7 @@
     <Compile Include="SocketState.cs" />
     <Compile Include="StateChange.cs" />
     <Compile Include="ObservableExtensions.cs" />
+    <Compile Include="BroadcastFrame.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

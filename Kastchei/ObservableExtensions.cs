@@ -13,7 +13,7 @@ namespace Kastchei
         public static IObservable<T> MatchOn<T>(this IObservable<JObject> observable, string match)
         {
             return observable.Where(x => x["payload"]["status"].Value<string>() == match)
-                             .Select(x => JsonConvert.DeserializeObject<Frame<T>>(x.ToString()))
+                             .Select(x => JsonConvert.DeserializeObject<ResponseFrame<T>>(x.ToString()))
                              .Select(x => x.Payload.Response);
         }
 

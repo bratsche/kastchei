@@ -37,7 +37,7 @@ namespace Kastchei
         public IObservable<T> On<T>(string evt)
         {
             return observable.Where(x => x["event"].Value<string>() == evt && x["ref"].Value<string>() == null)
-                             .Select(x => JsonConvert.DeserializeObject<Frame<T>>(x.ToString()).Payload.Response);
+                             .Select(x => JsonConvert.DeserializeObject<BroadcastFrame<T>>(x.ToString()).Payload);
         }
 
         public IObservable<JObject> Send(string evt, Dictionary<string, string> payload)
