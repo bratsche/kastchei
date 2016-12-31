@@ -29,6 +29,11 @@ namespace Kastchei
             return Send("phx_leave", null);
         }
 
+        public IObservable<JObject> On(string evt)
+        {
+            return observable.Where(x => x["event"].Value<string>() == evt && x["ref"].Value<string>() == null);
+        }
+
         public IObservable<T> On<T>(string evt)
         {
             return observable.Where(x => x["event"].Value<string>() == evt && x["ref"].Value<string>() == null)
