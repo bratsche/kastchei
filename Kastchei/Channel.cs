@@ -40,10 +40,11 @@ namespace Kastchei
                              .Select(x => JsonConvert.DeserializeObject<BroadcastFrame<T>>(x.ToString()).Payload);
         }
 
-        public IObservable<JObject> Send(string evt, Dictionary<string, string> payload)
+        public IObservable<JObject> Send<T>(string evt, T payload)
         {
             var frameRef = manager.MakeRef();
-            var frame = new PushFrame {
+            var frame = new PushFrame<T>
+            {
                 Topic = topic,
                 Event = evt,
                 Payload = payload,
@@ -56,6 +57,11 @@ namespace Kastchei
             manager.Send(json);
 
             return ret;
+        }
+
+        public IObservable<JObject> Send(string evt, Dictionary<string, string> payload)
+        {
+            return Send<IDictionary<string, string>>(evt, payload);
         }
 
         protected virtual void Dispose(bool disposing)

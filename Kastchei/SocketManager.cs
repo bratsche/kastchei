@@ -223,7 +223,7 @@ namespace Kastchei
 
         void SendHeartbeat()
         {
-            var frame = new PushFrame {
+            var frame = new PushFrame<IDictionary<string, string>> {
                 Topic = "phoenix",
                 Event = "heartbeat",
                 Payload = new Dictionary<string, string>(),
